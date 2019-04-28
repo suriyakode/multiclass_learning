@@ -1,6 +1,7 @@
 from scipy.optimize import minimize
 import numpy as np
 import numpy.random as random
+import time
 
 # Verify example from 17.2
 d = 2
@@ -75,5 +76,10 @@ def tune(pts, labels, start=-5, end=1, num=7):
             best_lmbda = lmbda
     return lmbda
 
+start = time.time()
+
 lmbda = tune(train_pts, train_labels)
-w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
+w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
+
+end = time.time()
+print (end - start)
