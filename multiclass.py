@@ -1,6 +1,7 @@
 from scipy.optimize import minimize
 import numpy as np
 import numpy.random as random
+import time
 
 random.seed(37)
 
@@ -93,8 +94,12 @@ def percent_correct(true_labels, hypothesis_labels):
     """
     return sum(true_labels == hypothesis_labels) / true_labels.size
 
-lmbda = tune(train_pts, train_labels)
-w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
-pred = predict(w_hat, test_pts)
-print(percent_correct(test_labels, pred))
+start = time.time()
 
+lmbda = tune(train_pts, train_labels)
+w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
+pred = predict(w_hat, test_pts)
+print("percent correct: " + str(percent_correct(test_labels, pred)))
+
+end = time.time()
+print("sec to run code: " + str(end - start))
