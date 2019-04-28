@@ -1,6 +1,9 @@
 from scipy.optimize import minimize
 import numpy as np
+import numpy.linalg as la
 import numpy.random as random
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import normalize
 import time
 
 random.seed(37)
@@ -9,14 +12,19 @@ random.seed(37)
 d = 2
 k = 4
 true = random.randn(d, k)
+true = normalize(true, axis=0)
 
 m = 420
 train_pts = random.randn(d, m)
+train_pts = train_pts / max(la.norm(train_pts, axis=0))
+# train_pts = normalize(train_pts, axis=0)
 train_labels = true.T @ train_pts
 train_labels = np.argmax(train_labels, axis=0)
 
 m_test = int(0.2 * m)
 test_pts = random.randn(d, m_test)
+test_pts = test_pts / max(la.norm(test_pts, axis=0))
+# test_pts = normalize(test_pts, axis=0)
 test_labels = true.T @ test_pts
 test_labels = np.argmax(test_labels, axis=0)
 
@@ -46,10 +54,13 @@ def svm_loss(lmbda, data, labels):
         w = w.reshape(d, int(dk / d))
         
         for j in range(m):
-            delta = np.ones(k)
-            delta[labels[j]] -= 1
-            pt_loss = np.max(delta + w.T @ data[:, j]) - w[:, labels[j]] @ data[:, j]
-            loss += (1 / m) * pt_loss
+            largest = -np.Infinity
+            for i in range(k):
+                curr = delta(i, labels[j]) + w[:, i] @ data[:, j]
+                if curr > largest:
+                    largest = curr
+            largest = largest - w[:, labels[j]] @ data[:, j]
+            loss += (1 / m) * largest
         return loss
     return loss
 
@@ -94,12 +105,41 @@ def percent_correct(true_labels, hypothesis_labels):
     """
     return sum(true_labels == hypothesis_labels) / true_labels.size
 
+def normalize_weights(w, d, k):
+    """
+    Takes in w, a np vector of size d * k, and returns the W matrix
+    of size d by k, with columns normalized
+    """
+    w = w.reshape(d, k)
+    return normalize(w, axis=0)
+
 start = time.time()
 
 lmbda = tune(train_pts, train_labels)
 w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
 pred = predict(w_hat, test_pts)
-print("percent correct: " + str(percent_correct(test_labels, pred)))
+print('percent correct: ' + str(percent_correct(test_labels, pred)))
 
 end = time.time()
-print("sec to run code: " + str(end - start))
+print('sec to run code: ' + str(end - start))
+
+# Plot true weight vectors and guess
+guess = normalize_weights(w_hat, d, k)
+plt.figure()
+ax = plt.gca()
+X = np.zeros(k)
+Y = np.zeros(k)
+q1 = ax.quiver(X, Y, true[0], true[1], angles='xy', scale_units='xy', scale=1)
+q2 = ax.quiver(X, Y, guess[0], guess[1], angles='xy', scale_units='xy', scale=1, color='rebeccapurple')
+xmin = min(min(true[0]), min(guess[0]))
+xmax = max(max(true[0]), max(guess[0]))
+ymin = min(min(true[1]), min(guess[1]))
+ymax = max(max(true[1]), max(guess[1]))
+ax.set_xlim([xmin - 1, xmax + 1])
+ax.set_ylim([ymin - 1, ymax + 1])
+plt.title('Multiclass SVM')
+plt.legend((q1, q2), ('True weights', 'Guess weights, normalized'))
+plt.draw()
+plt.show()
+
+
