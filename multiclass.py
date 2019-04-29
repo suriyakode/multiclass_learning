@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 import time
 
-random.seed(37)
-
 def generate_points(d, k, m_train, m_test):
     """
     Generate true weights, training points, and test points.
@@ -86,7 +84,7 @@ def multiclass_svm(lmbda, pts, labels):
     loss_val = loss_fn(res.x)
     return res.x, loss_val
 
-def tune(pts, labels, start=-5, end=1, num=7):
+def tune(pts, labels, start=-5, end=5, num=11):
     """
     Use the provided pts and associated labels to determine the
     best lambda to run multiclass svm. Uses log spacing for
@@ -173,7 +171,6 @@ def plot_weights(true, w_hat, d, k):
 
 def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
     accuracies = []
-    lmbdas = []
     samples = [int(m) for m in np.linspace(m_min, m_max, num)]
     true, full_train_pts, full_train_labels, \
             test_pts, test_labels = \
@@ -184,20 +181,21 @@ def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
         train_labels = full_train_labels[:m]
 
         # Train, predict, and add accuracy to list
-        lmbda = tune(train_pts, train_labels)
+        lmbda = 1e-2
         w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
         pred = predict(w_hat, test_pts)
         acc = percent_correct(test_labels, pred)
         accuracies.append(acc)
-        lmbdas.append(lmbda)
         print('m = {}, acc = {}'.format(m, acc))
     plt.title('Accuracy vs number of samples for d = {}'.format(d))
     plt.plot(samples, accuracies, '-')
     plt.xlabel('Number of samples')
     plt.ylabel('Accuracy on {} test points'.format(m_test))
     plt.show()
-    return accuracies, samples, lmbdas
+    return accuracies, samples
 
+# Visualize vectors in 2d
+random.seed(37)
 start = time.time()
 
 d = 2
@@ -216,11 +214,11 @@ print('sec to run code: ' + str(end - start))
 plot_weights(true, w_hat, d, k)
 
 # Plot accuracies vs samples
+random.seed(37)
 start = time.time()
-accuracies, samples, lmbdas = plot_acc_vs_samples(d, k, 100, 10, 500, 15)
+accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25)
 end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
 print('accuracies = {}'.format(accuracies))
 print('samples = {}'.format(samples))
-print('lmbdas = {}'.format(lmbdas))
 
