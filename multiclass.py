@@ -8,25 +8,40 @@ import time
 
 random.seed(37)
 
-# Verify example from 17.2
-d = 2
-k = 4
-true = random.randn(d, k)
-true = normalize(true, axis=0)
+def generate_points(d, k, m_train, m_test):
+    """
+    Generate true weights, training points, and test points.
+    d :         Ambient dimension
+    k :         Number of classes
+    m_train :   Number of points in training set
+    m_test :    Number of points in test set
 
-m = 420
-train_pts = random.randn(d, m)
-train_pts = train_pts / max(la.norm(train_pts, axis=0))
-# train_pts = normalize(train_pts, axis=0)
-train_labels = true.T @ train_pts
-train_labels = np.argmax(train_labels, axis=0)
+    Returns
+    true :          k weight vectors in d dimensions as a d by k matrix
+    train_pts :     m_train vectors in d dimensions as d by m_train matrix,
+                    the columns of which are in the unit ball
+    train_labels :  Labels for the train_pts as given by the true weights
+    test_pts :      m_test vectors in d dimensions as a d by m_test matrix,
+                    the columns of which are in the unit ball
+    test_labels :   Labels for the test_pts as given by the true weights
+    """
+    true = random.randn(d, k)
+    true = normalize(true, axis=0)
 
-m_test = int(0.2 * m)
-test_pts = random.randn(d, m_test)
-test_pts = test_pts / max(la.norm(test_pts, axis=0))
-# test_pts = normalize(test_pts, axis=0)
-test_labels = true.T @ test_pts
-test_labels = np.argmax(test_labels, axis=0)
+    train_pts = random.randn(d, m_train)
+    train_pts = train_pts / max(la.norm(train_pts, axis=0))
+    # train_pts = normalize(train_pts, axis=0)
+    train_labels = true.T @ train_pts
+    train_labels = np.argmax(train_labels, axis=0)
+
+    test_pts = random.randn(d, m_test)
+    test_pts = test_pts / max(la.norm(test_pts, axis=0))
+    # test_pts = normalize(test_pts, axis=0)
+    test_labels = true.T @ test_pts
+    test_labels = np.argmax(test_labels, axis=0)
+
+    return true, train_pts, train_labels, test_pts, test_labels
+
 
 def delta(i, j):
     """
@@ -71,6 +86,7 @@ def multiclass_svm(lmbda, pts, labels):
     loss_val = loss_fn(res.x)
     return res.x, loss_val
 
+# TODO: modify to use hold out
 def tune(pts, labels, start=-5, end=1, num=7):
     """
     Use the provided pts and associated labels to determine the
@@ -113,7 +129,55 @@ def normalize_weights(w, d, k):
     w = w.reshape(d, k)
     return normalize(w, axis=0)
 
+def plot_weights(true, w_hat, d, k):
+    """
+    Plot (in 2D) the true weight vectors and the guesses for them
+    w_hat :     A numpy vector of length d * k
+    true :      The true weights as a d by k matrix
+    d :         The ambient dimension
+    k :         The number of classes
+    """
+    assert d == 2
+    guess = normalize_weights(w_hat, d, k)
+    plt.figure()
+    ax = plt.gca()
+    X = np.zeros(k)
+    Y = np.zeros(k)
+    q1 = ax.quiver(X, Y, true[0], true[1], angles='xy', scale_units='xy', scale=1)
+    q2 = ax.quiver(X, Y, guess[0], guess[1], angles='xy', scale_units='xy', scale=1, color='rebeccapurple')
+    xmin = min(min(true[0]), min(guess[0]))
+    xmax = max(max(true[0]), max(guess[0]))
+    ymin = min(min(true[1]), min(guess[1]))
+    ymax = max(max(true[1]), max(guess[1]))
+    ax.set_xlim([xmin - 1, xmax + 1])
+    ax.set_ylim([ymin - 1, ymax + 1])
+    plt.title('Multiclass SVM')
+    plt.legend((q1, q2), ('True weights', 'Guess weights, normalized'))
+    plt.draw()
+    plt.show()
+
+def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
+    accuracies = []
+    samples = [int(m) for m in np.linspace(m_min, m_max, num)]
+    for m in samples:
+        true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, m, m_test)
+        lmbda = tune(train_pts, train_labels)
+        w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
+        pred = predict(w_hat, test_pts)
+        acc = percent_correct(test_labels, pred)
+        accuracies.append(acc)
+    plt.title('Accuracy vs number of samples for d = ' + str(d))
+    plt.plot(samples, accuracies, '-')
+    plt.xlabel('Number of samples')
+    plt.ylabel('Accuracy on ' + str(m_test) + ' test points')
+    plt.show()
+    return accuracies, samples
+
 start = time.time()
+
+d = 2
+k = 4
+true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 10, int(2))
 
 lmbda = tune(train_pts, train_labels)
 w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
@@ -124,22 +188,11 @@ end = time.time()
 print('sec to run code: ' + str(end - start))
 
 # Plot true weight vectors and guess
-guess = normalize_weights(w_hat, d, k)
-plt.figure()
-ax = plt.gca()
-X = np.zeros(k)
-Y = np.zeros(k)
-q1 = ax.quiver(X, Y, true[0], true[1], angles='xy', scale_units='xy', scale=1)
-q2 = ax.quiver(X, Y, guess[0], guess[1], angles='xy', scale_units='xy', scale=1, color='rebeccapurple')
-xmin = min(min(true[0]), min(guess[0]))
-xmax = max(max(true[0]), max(guess[0]))
-ymin = min(min(true[1]), min(guess[1]))
-ymax = max(max(true[1]), max(guess[1]))
-ax.set_xlim([xmin - 1, xmax + 1])
-ax.set_ylim([ymin - 1, ymax + 1])
-plt.title('Multiclass SVM')
-plt.legend((q1, q2), ('True weights', 'Guess weights, normalized'))
-plt.draw()
-plt.show()
+plot_weights(true, w_hat, d, k)
 
+# Plot accuracies vs samples
+start = time.time()
+accuracies, samples = plot_acc_vs_samples(d, k, 100)
+end = time.time()
+print('sec to run acc vs samples plots: ' + str(end - start))
 
