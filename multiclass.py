@@ -90,17 +90,33 @@ def multiclass_svm(lmbda, pts, labels):
 def tune(pts, labels, start=-5, end=1, num=7):
     """
     Use the provided pts and associated labels to determine the
-    best lambda to run multiclass svm
+    best lambda to run multiclass svm. Uses log spacing for
+    lambdas to test against
+    pts :       np array of size d * m where m is number of points
+    labels :    np vector of size m
+    start :     start of log space
+    end :       end of log space
+    num :       number of lambdas to try
     """
+    # Hold out 25% of data to evaluate loss
+    m = pts.shape[1]
+    m_holdout = int(0.25 * m)
+    holdout_pts = pts[:, -m_holdout:]
+    holdout_labels = labels[-m_holdout:]
+
+    pts = pts[:, :-m_holdout]
+    labels = labels[:-m_holdout]
+
     lmbdas = np.logspace(start, end, num)
     best_loss = np.Infinity
     best_lmbda = -1
     for lmbda in lmbdas:
-        _, loss = multiclass_svm(lmbda, pts, labels)
+        w, _ = multiclass_svm(lmbda, pts, labels)
+        loss = percent_correct(holdout_labels, predict(w, holdout_pts))
         if loss < best_loss:
             best_loss = loss
             best_lmbda = lmbda
-    return lmbda
+    return best_lmbda
 
 def predict(w, pts):
     """
@@ -177,7 +193,7 @@ start = time.time()
 
 d = 2
 k = 4
-true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 10, int(2))
+true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 420, int(100))
 
 lmbda = tune(train_pts, train_labels)
 w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
@@ -192,7 +208,7 @@ plot_weights(true, w_hat, d, k)
 
 # Plot accuracies vs samples
 start = time.time()
-accuracies, samples = plot_acc_vs_samples(d, k, 100)
+# accuracies, samples = plot_acc_vs_samples(d, k, 100)
 end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
 
