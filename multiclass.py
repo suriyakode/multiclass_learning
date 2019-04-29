@@ -86,7 +86,6 @@ def multiclass_svm(lmbda, pts, labels):
     loss_val = loss_fn(res.x)
     return res.x, loss_val
 
-# TODO: modify to use hold out
 def tune(pts, labels, start=-5, end=1, num=7):
     """
     Use the provided pts and associated labels to determine the
@@ -174,20 +173,30 @@ def plot_weights(true, w_hat, d, k):
 
 def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
     accuracies = []
+    lmbdas = []
     samples = [int(m) for m in np.linspace(m_min, m_max, num)]
+    true, full_train_pts, full_train_labels, \
+            test_pts, test_labels = \
+            generate_points(d, k, m_max, m_test)
     for m in samples:
-        true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, m, m_test)
+        # Pick first m samples
+        train_pts = full_train_pts[:, :m]
+        train_labels = full_train_labels[:m]
+
+        # Train, predict, and add accuracy to list
         lmbda = tune(train_pts, train_labels)
         w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
         pred = predict(w_hat, test_pts)
         acc = percent_correct(test_labels, pred)
         accuracies.append(acc)
-    plt.title('Accuracy vs number of samples for d = ' + str(d))
+        lmbdas.append(lmbda)
+        print('m = {}, acc = {}'.format(m, acc))
+    plt.title('Accuracy vs number of samples for d = {}'.format(d))
     plt.plot(samples, accuracies, '-')
     plt.xlabel('Number of samples')
-    plt.ylabel('Accuracy on ' + str(m_test) + ' test points')
+    plt.ylabel('Accuracy on {} test points'.format(m_test))
     plt.show()
-    return accuracies, samples
+    return accuracies, samples, lmbdas
 
 start = time.time()
 
@@ -208,7 +217,10 @@ plot_weights(true, w_hat, d, k)
 
 # Plot accuracies vs samples
 start = time.time()
-# accuracies, samples = plot_acc_vs_samples(d, k, 100)
+accuracies, samples, lmbdas = plot_acc_vs_samples(d, k, 100, 10, 500, 15)
 end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
+print('accuracies = {}'.format(accuracies))
+print('samples = {}'.format(samples))
+print('lmbdas = {}'.format(lmbdas))
 
