@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
 import time
 
-def generate_points(d, k, m_train, m_test):
+def generate_points(d, k, m_train, m_test, dist):
     """
     Generate true weights, training points, and test points.
     d :         Ambient dimension
@@ -22,17 +22,18 @@ def generate_points(d, k, m_train, m_test):
     test_pts :      m_test vectors in d dimensions as a d by m_test matrix,
                     the columns of which are in the unit ball
     test_labels :   Labels for the test_pts as given by the true weights
+    dist :          Distribution from which to generate weights and points
     """
-    true = random.randn(d, k)
+    true = dist(d, k)
     true = normalize(true, axis=0)
 
-    train_pts = random.randn(d, m_train)
+    train_pts = dist(d, m_train)
     train_pts = train_pts / max(la.norm(train_pts, axis=0))
     # train_pts = normalize(train_pts, axis=0)
     train_labels = true.T @ train_pts
     train_labels = np.argmax(train_labels, axis=0)
 
-    test_pts = random.randn(d, m_test)
+    test_pts = dist(d, m_test)
     test_pts = test_pts / max(la.norm(test_pts, axis=0))
     # test_pts = normalize(test_pts, axis=0)
     test_labels = true.T @ test_pts
@@ -77,9 +78,9 @@ def svm_loss(lmbda, data, labels):
         return loss
     return loss
 
-def multiclass_svm(lmbda, pts, labels):
+def multiclass_svm(lmbda, pts, labels, dist=random.randn):
     loss_fn = svm_loss(lmbda, pts, labels)
-    w_guess = random.randn(d * k)
+    w_guess = dist(d * k)
     res = minimize(loss_fn, w_guess)
     loss_val = loss_fn(res.x)
     return res.x, loss_val
@@ -169,12 +170,12 @@ def plot_weights(true, w_hat, d, k):
     plt.draw()
     plt.show()
 
-def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
+def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25, dist=random.randn):
     accuracies = []
     samples = [int(m) for m in np.linspace(m_min, m_max, num)]
     true, full_train_pts, full_train_labels, \
             test_pts, test_labels = \
-            generate_points(d, k, m_max, m_test)
+            generate_points(d, k, m_max, m_test, dist)
     for m in samples:
         # Pick first m samples
         train_pts = full_train_pts[:, :m]
@@ -182,7 +183,7 @@ def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
 
         # Train, predict, and add accuracy to list
         lmbda = 1e-2
-        w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels)
+        w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels, dist)
         pred = predict(w_hat, test_pts)
         acc = percent_correct(test_labels, pred)
         accuracies.append(acc)
@@ -193,6 +194,13 @@ def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25):
     plt.ylabel('Accuracy on {} test points'.format(m_test))
     plt.show()
     return accuracies, samples
+
+def unif(*dims):
+    """
+    Sample uniformly from [-1, 1]
+    """
+    sample = random.rand(*dims)
+    return (sample * 2) - 1
 
 # Visualize vectors in 2d
 random.seed(37)
@@ -213,10 +221,19 @@ print('sec to run code: ' + str(end - start))
 # Plot true weight vectors and guess
 plot_weights(true, w_hat, d, k)
 
-# Plot accuracies vs samples
+# Plot accuracies vs samples with points generated from random normal dist
 random.seed(37)
 start = time.time()
 accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25)
+end = time.time()
+print('sec to run acc vs samples plots: ' + str(end - start))
+print('accuracies = {}'.format(accuracies))
+print('samples = {}'.format(samples))
+
+# Plot accuracies vs samples with points generated from uniform dist
+random.seed(37)
+start = time.time()
+accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25, unif)
 end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
 print('accuracies = {}'.format(accuracies))
