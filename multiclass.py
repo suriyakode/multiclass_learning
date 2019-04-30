@@ -282,6 +282,7 @@ def plot_samples_vs_d(acc, k, m_test, trials=10, d_min=1, d_max=20, num=10, step
     plt.plot(x, y, '-')
     plt.xlabel('Ambient dimension d')
     plt.ylabel('Min number of samples to get accuracy = {} on {} test points'.format(acc, m_test))
+    plt.savefig('samples_vs_d.png')
     plt.show()
 
     return d_to_samples
@@ -292,36 +293,36 @@ start = time.time()
 
 d = 2
 k = 4
-true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 420, int(100), random.randn)
+# true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 420, int(100), random.randn)
 
-lmbda = tune(d, k, train_pts, train_labels)
-w_hat, loss_val = multiclass_svm(d, k, lmbda, train_pts, train_labels)
-pred = predict(w_hat, test_pts)
-print('percent correct: ' + str(percent_correct(test_labels, pred)))
+# lmbda = tune(d, k, train_pts, train_labels)
+# w_hat, loss_val = multiclass_svm(d, k, lmbda, train_pts, train_labels)
+# pred = predict(w_hat, test_pts)
+# print('percent correct: ' + str(percent_correct(test_labels, pred)))
 
-end = time.time()
-print('sec to run code: ' + str(end - start))
+# end = time.time()
+# print('sec to run code: ' + str(end - start))
 
-# Plot true weight vectors and guess
-plot_weights(true, w_hat, d, k)
+# # Plot true weight vectors and guess
+# plot_weights(true, w_hat, d, k)
 
-# Plot accuracies vs samples with points generated from random normal dist
-random.seed(37)
-start = time.time()
-accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25)
-end = time.time()
-print('sec to run acc vs samples plots: ' + str(end - start))
-print('accuracies = {}'.format(accuracies))
-print('samples = {}'.format(samples))
+# # Plot accuracies vs samples with points generated from random normal dist
+# random.seed(37)
+# start = time.time()
+# accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25)
+# end = time.time()
+# print('sec to run acc vs samples plots: ' + str(end - start))
+# print('accuracies = {}'.format(accuracies))
+# print('samples = {}'.format(samples))
 
-# Plot accuracies vs samples with points generated from uniform dist
-random.seed(37)
-start = time.time()
-accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25, unif)
-end = time.time()
-print('sec to run acc vs samples plots: ' + str(end - start))
-print('accuracies = {}'.format(accuracies))
-print('samples = {}'.format(samples))
+# # Plot accuracies vs samples with points generated from uniform dist
+# random.seed(37)
+# start = time.time()
+# accuracies, samples = plot_acc_vs_samples(d, k, 100, 10, 1000, 25, unif)
+# end = time.time()
+# print('sec to run acc vs samples plots: ' + str(end - start))
+# print('accuracies = {}'.format(accuracies))
+# print('samples = {}'.format(samples))
 
 # Plot number of points vs ambient dimension for fixed accuracy
 random.seed(37)
