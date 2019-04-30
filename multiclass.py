@@ -25,22 +25,34 @@ def generate_points(d, k, m_train, m_test, dist):
     dist :          Distribution from which to generate weights and points
     """
     true = dist(d, k)
+    train_pts = dist(d, m_train)
+    test_pts = dist(d, m_test)
+
+    return generate_labels_and_normalize(true, train_pts, test_pts)
+
+def generate_labels_and_normalize(true, train_pts, test_pts):
+    """
+    Normalize true weight vectors and points, and generates
+    labels for data points according to the true weights.
+    true :      True weights, unnormalized. k vectors in d dimensions
+                as a d by k matrix.
+    train_pts : Training points, unnormalized. m_train vectors in d
+                dimensions as a d by m_train matrix.
+    test_pts :  Test points, unnormalized. m_test vectors in d
+                dimensions as a d by m_test
+    """
     true = normalize(true, axis=0)
 
-    train_pts = dist(d, m_train)
     train_pts = train_pts / max(la.norm(train_pts, axis=0))
     # train_pts = normalize(train_pts, axis=0)
     train_labels = true.T @ train_pts
     train_labels = np.argmax(train_labels, axis=0)
 
-    test_pts = dist(d, m_test)
     test_pts = test_pts / max(la.norm(test_pts, axis=0))
     # test_pts = normalize(test_pts, axis=0)
     test_labels = true.T @ test_pts
     test_labels = np.argmax(test_labels, axis=0)
-
     return true, train_pts, train_labels, test_pts, test_labels
-
 
 def delta(i, j):
     """
@@ -78,18 +90,20 @@ def svm_loss(lmbda, data, labels):
         return loss
     return loss
 
-def multiclass_svm(lmbda, pts, labels, dist=random.randn):
+def multiclass_svm(d, k, lmbda, pts, labels, dist=random.randn):
     loss_fn = svm_loss(lmbda, pts, labels)
     w_guess = dist(d * k)
     res = minimize(loss_fn, w_guess)
     loss_val = loss_fn(res.x)
     return res.x, loss_val
 
-def tune(pts, labels, start=-5, end=5, num=11):
+def tune(d, k, pts, labels, start=-5, end=5, num=11):
     """
     Use the provided pts and associated labels to determine the
     best lambda to run multiclass svm. Uses log spacing for
     lambdas to test against
+    d :         Ambient dimension
+    k :         Number of classes
     pts :       np array of size d * m where m is number of points
     labels :    np vector of size m
     start :     start of log space
@@ -109,7 +123,7 @@ def tune(pts, labels, start=-5, end=5, num=11):
     best_loss = np.Infinity
     best_lmbda = -1
     for lmbda in lmbdas:
-        w, _ = multiclass_svm(lmbda, pts, labels)
+        w, _ = multiclass_svm(d, k, lmbda, pts, labels)
         loss = percent_correct(holdout_labels, predict(w, holdout_pts))
         if loss < best_loss:
             best_loss = loss
@@ -183,7 +197,7 @@ def plot_acc_vs_samples(d, k, m_test, m_min=10, m_max=500, num=25, dist=random.r
 
         # Train, predict, and add accuracy to list
         lmbda = 1e-2
-        w_hat, _ = multiclass_svm(lmbda, train_pts, train_labels, dist)
+        w_hat, _ = multiclass_svm(d, k, lmbda, train_pts, train_labels, dist)
         pred = predict(w_hat, test_pts)
         acc = percent_correct(test_labels, pred)
         accuracies.append(acc)
@@ -202,16 +216,81 @@ def unif(*dims):
     sample = random.rand(*dims)
     return (sample * 2) - 1
 
+def plot_samples_vs_d(acc, k, m_test, d_min=1, d_max=10, num=6, step=25, m_max=500, dist=random.randn):
+    """
+    Plot samples needed to achieve acc accuracy for varying d, the ambient dimension.
+    Will not exceed usage of m_max points.
+    acc :       1 - delta accuracy
+    k :         Number of classes
+    m_test :    Number of points for test set
+    d_min :     Smallest d to use
+    d_max :     Largest d to use
+    num :       Number of d's to evaluate for. Plot will contain <= num number of points
+    step :      Increments of number of samples used for training
+                (i.e. # samples will be a multiple of step)
+    m_max :     Largest number of points to use to achieve accuracy. This value is set
+                to prevent overly large runtime
+    dist :      Distribution from which to generate the points
+    """
+    # Generate points -- reused throughout function
+    raw_true = dist(d_max, k)
+    raw_train_pts = dist(d_max, m_max)
+    raw_test_pts = dist(d_max, m_test)
+
+    # Initialize d's and m's to search over
+    d_to_samples = dict()
+    all_ds = [int(d) for d in np.linspace(d_min, d_max, num)]
+    all_m = [int(m) for m in np.arange(np.floor(m_max / step)) * step]
+
+    for d in all_ds:
+        # Take subset of d dimensions
+        true = raw_true[:d, :]
+        full_train_pts = raw_train_pts[:d, :]
+        test_pts = raw_test_pts[:d, :]
+
+        # Generate labels and normalize accordingly
+        true, full_train_pts, full_train_labels, \
+            test_pts, test_labels = \
+            generate_labels_and_normalize(true, full_train_pts, test_pts)
+
+        for m in all_m:
+            # Subset out m points
+            train_pts = full_train_pts[:, :m]
+            train_labels = full_train_labels[:m]
+
+            # Train and check accuracy
+            lmbda = 1e-2
+            w_hat, _ = multiclass_svm(d, k, lmbda, train_pts, train_labels, dist)
+            pred = predict(w_hat, test_pts)
+            curr_acc = percent_correct(test_labels, pred)
+
+            # Add to map if satisfies accuracy
+            if curr_acc >= acc:
+                print('d = {}, num samples needed = {}, curr_acc = {}'.format(d, m, curr_acc))
+                d_to_samples[d] = m
+                break
+
+    # Generate plot
+    lists = sorted(d_to_samples.items())
+    x, y = zip(*lists)
+    plt.title('Min number of samples vs d for accuracy = {}'.format(acc))
+    plt.plot(x, y, '-')
+    plt.xlabel('Ambient dimension d')
+    plt.ylabel('Min number of samples to get accuracy = {} on {} test points'.format(acc, m_test))
+    plt.show()
+
+    return d_to_samples
+
 # Visualize vectors in 2d
 random.seed(37)
 start = time.time()
 
 d = 2
 k = 4
-true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 420, int(100))
+true, train_pts, train_labels, test_pts, test_labels = generate_points(d, k, 420, int(100), random.randn)
 
-lmbda = tune(train_pts, train_labels)
-w_hat, loss_val = multiclass_svm(lmbda, train_pts, train_labels)
+lmbda = tune(d, k, train_pts, train_labels)
+w_hat, loss_val = multiclass_svm(d, k, lmbda, train_pts, train_labels)
 pred = predict(w_hat, test_pts)
 print('percent correct: ' + str(percent_correct(test_labels, pred)))
 
@@ -238,4 +317,11 @@ end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
 print('accuracies = {}'.format(accuracies))
 print('samples = {}'.format(samples))
+
+# Plot number of points vs ambient dimension for fixed accuracy
+random.seed(37)
+start = time.time()
+d_to_samples = plot_samples_vs_d(0.9, k, 100)
+end = time.time()
+print('sec to run acc vs samples plots: ' + str(end - start))
 
