@@ -216,7 +216,7 @@ def unif(*dims):
     sample = random.rand(*dims)
     return (sample * 2) - 1
 
-def plot_samples_vs_d(acc, k, m_test, d_min=1, d_max=10, num=6, step=25, m_max=500, dist=random.randn):
+def plot_samples_vs_d(acc, k, m_test, trials=10, d_min=1, d_max=20, num=10, step=25, m_max=1000, dist=random.randn):
     """
     Plot samples needed to achieve acc accuracy for varying d, the ambient dimension.
     Will not exceed usage of m_max points.
@@ -232,47 +232,52 @@ def plot_samples_vs_d(acc, k, m_test, d_min=1, d_max=10, num=6, step=25, m_max=5
                 to prevent overly large runtime
     dist :      Distribution from which to generate the points
     """
-    # Generate points -- reused throughout function
-    raw_true = dist(d_max, k)
-    raw_train_pts = dist(d_max, m_max)
-    raw_test_pts = dist(d_max, m_test)
-
     # Initialize d's and m's to search over
     d_to_samples = dict()
     all_ds = [int(d) for d in np.linspace(d_min, d_max, num)]
     all_m = [int(m) for m in np.arange(np.floor(m_max / step)) * step]
 
-    for d in all_ds:
-        # Take subset of d dimensions
-        true = raw_true[:d, :]
-        full_train_pts = raw_train_pts[:d, :]
-        test_pts = raw_test_pts[:d, :]
+    for _ in range(trials):
+        # Generate points -- reused throughout function
+        raw_true = dist(d_max, k)
+        raw_train_pts = dist(d_max, m_max)
+        raw_test_pts = dist(d_max, m_test)
 
-        # Generate labels and normalize accordingly
-        true, full_train_pts, full_train_labels, \
-            test_pts, test_labels = \
-            generate_labels_and_normalize(true, full_train_pts, test_pts)
+        for d in all_ds:
+            # Take subset of d dimensions
+            true = raw_true[:d, :]
+            full_train_pts = raw_train_pts[:d, :]
+            test_pts = raw_test_pts[:d, :]
 
-        for m in all_m:
-            # Subset out m points
-            train_pts = full_train_pts[:, :m]
-            train_labels = full_train_labels[:m]
+            # Generate labels and normalize accordingly
+            true, full_train_pts, full_train_labels, \
+                test_pts, test_labels = \
+                generate_labels_and_normalize(true, full_train_pts, test_pts)
 
-            # Train and check accuracy
-            lmbda = 1e-2
-            w_hat, _ = multiclass_svm(d, k, lmbda, train_pts, train_labels, dist)
-            pred = predict(w_hat, test_pts)
-            curr_acc = percent_correct(test_labels, pred)
+            for m in all_m:
+                # Subset out m points
+                train_pts = full_train_pts[:, :m]
+                train_labels = full_train_labels[:m]
 
-            # Add to map if satisfies accuracy
-            if curr_acc >= acc:
-                print('d = {}, num samples needed = {}, curr_acc = {}'.format(d, m, curr_acc))
-                d_to_samples[d] = m
-                break
+                # Train and check accuracy
+                lmbda = 1e-2
+                w_hat, _ = multiclass_svm(d, k, lmbda, train_pts, train_labels, dist)
+                pred = predict(w_hat, test_pts)
+                curr_acc = percent_correct(test_labels, pred)
+
+                # Add to map if satisfies accuracy
+                if curr_acc >= acc:
+                    print('d = {}, num samples needed = {}, curr_acc = {}'.format(d, m, curr_acc))
+                    if d in d_to_samples:
+                        d_to_samples[d].append(m)
+                    else:
+                        d_to_samples[d] = [m]
+                    break
 
     # Generate plot
     lists = sorted(d_to_samples.items())
     x, y = zip(*lists)
+    y = [np.average(ms) for ms in y]
     plt.title('Min number of samples vs d for accuracy = {}'.format(acc))
     plt.plot(x, y, '-')
     plt.xlabel('Ambient dimension d')
