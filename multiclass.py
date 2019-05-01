@@ -216,7 +216,7 @@ def unif(*dims):
     sample = random.rand(*dims)
     return (sample * 2) - 1
 
-def plot_samples_vs_d(acc, k, m_test, trials=10, d_min=1, d_max=20, num=10, step=25, m_max=1000, dist=random.randn):
+def plot_samples_vs_d(acc, k, m_test, trials=1, d_min=1, d_max=20, num=10, step=25, m_max=1000, dist=random.randn):
     """
     Plot samples needed to achieve acc accuracy for varying d, the ambient dimension.
     Will not exceed usage of m_max points.
