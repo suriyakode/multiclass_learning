@@ -287,6 +287,78 @@ def plot_samples_vs_d(acc, k, m_test, trials=10, d_min=1, d_max=20, num=10, step
 
     return d_to_samples
 
+def plot_samples_vs_k(acc, d, m_test, trials=1, k_min=1, k_max=7, num=6, step=25, m_max=1000, dist=random.randn):
+    """
+    Plot samples needed to achieve acc accuracy for varying d, the ambient dimension.
+    Will not exceed usage of m_max points.
+    acc :       1 - delta accuracy
+    k :         Number of classes
+    m_test :    Number of points for test set
+    d_min :     Smallest d to use
+    d_max :     Largest d to use
+    num :       Number of d's to evaluate for. Plot will contain <= num number of points
+    step :      Increments of number of samples used for training
+                (i.e. # samples will be a multiple of step)
+    m_max :     Largest number of points to use to achieve accuracy. This value is set
+                to prevent overly large runtime
+    dist :      Distribution from which to generate the points
+    """
+    # Initialize d's and m's to search over
+    global k
+    k_to_samples = dict()
+    all_ks = [int(k) for k in np.linspace(k_min, k_max, num)]
+    all_m = [int(m) for m in np.arange(np.floor(m_max / step)) * step]
+
+    for _ in range(trials):
+        # Generate points -- reused throughout function
+        raw_true = dist(d, k_max)
+        raw_train_pts = dist(d, m_max)
+        raw_test_pts = dist(d, m_test)
+
+        for k in all_ks:
+            # Take subset of d dimensions
+            true = raw_true[:, :k]
+            full_train_pts = raw_train_pts[:, :]
+            test_pts = raw_test_pts[:, :]
+
+            # Generate labels and normalize accordingly
+            true, full_train_pts, full_train_labels, \
+                test_pts, test_labels = \
+                generate_labels_and_normalize(true, full_train_pts, test_pts)
+
+            for m in all_m:
+                # Subset out m points
+                train_pts = full_train_pts[:, :m]
+                train_labels = full_train_labels[:m]
+
+                # Train and check accuracy
+                lmbda = 1e-2
+                w_hat, _ = multiclass_svm(d, k, lmbda, train_pts, train_labels, dist)
+                pred = predict(w_hat, test_pts)
+                curr_acc = percent_correct(test_labels, pred)
+
+                # Add to map if satisfies accuracy
+                if curr_acc >= acc:
+                    print('k = {}, num samples needed = {}, curr_acc = {}'.format(k, m, curr_acc))
+                    if k in k_to_samples:
+                        k_to_samples[k].append(m)
+                    else:
+                        k_to_samples[k] = [m]
+                    break
+
+    # Generate plot
+    lists = sorted(k_to_samples.items())
+    x, y = zip(*lists)
+    y = [np.average(ms) for ms in y]
+    plt.title('Min number of samples vs k for accuracy = {}'.format(acc))
+    plt.plot(x, y, '-')
+    plt.xlabel('Number of classes k')
+    plt.ylabel('Min number of samples to get accuracy = {} on {} test points'.format(acc, m_test))
+    plt.savefig('samples_vs_k.png')
+    plt.show()
+
+    return k_to_samples
+
 # Visualize vectors in 2d
 random.seed(37)
 start = time.time()
@@ -327,7 +399,7 @@ k = 4
 # Plot number of points vs ambient dimension for fixed accuracy
 random.seed(37)
 start = time.time()
-d_to_samples = plot_samples_vs_d(0.9, k, 100)
+k_to_samples = plot_samples_vs_k(0.9, d, 100)
 end = time.time()
 print('sec to run acc vs samples plots: ' + str(end - start))
 
